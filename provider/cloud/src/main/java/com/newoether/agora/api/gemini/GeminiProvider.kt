@@ -449,16 +449,6 @@ class GeminiProvider(
                 "$baseUrl/v1beta/models/$cleanModelName:streamGenerateContent?alt=sse"
             }
 
-            // Build headers: provider-specific overrides generic headers to prevent conflicts.
-            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
-            val headers = mapOf(
-                "Content-Type" to "application/json",
-                "x-goog-api-key" to config.apiKey
-            )
-            // Merge generic headers (lower priority), override with apiKey, then provider-specific (highest priority)
-            for ((key, value) in configGenericHeaders) headers[key] = value
-            headers["x-goog-api-key"] = config.apiKey
-            val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             val retryableCodes = setOf(429, 500, 502, 503, 504)
             var attempt = 0
             var done = false
@@ -466,6 +456,8 @@ class GeminiProvider(
             while (attempt < maxAttempts && !done) {
                 attempt++
                 val base64Files = Base64FileRegistry()
+                // Build headers: generic config.headers + x-goog-api-key + getExtraHeaders() override
+                val headers = HttpClient.mergeHeaders(config.extraGenericHeaders, mapOf("x-goog-api-key" to config.apiKey), getExtraHeaders(config)) { _, k, v -> result[k] = v }
                 val requestBody = buildRequestBody(
                     config.resolveRequest(messages),
                     base64Files,

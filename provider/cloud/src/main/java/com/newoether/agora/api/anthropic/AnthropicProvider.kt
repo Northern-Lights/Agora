@@ -370,14 +370,6 @@ class AnthropicProvider(
 
         try {
             val url = "$baseUrl/messages"
-            // Build headers: provider-specific overrides generic headers to prevent conflicts.
-            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
-            val headers = mutableMapOf("Content-Type" to "application/json")
-            // Generic headers go first (lower priority), then API key/version, then provider-specific
-            for ((key, value) in configGenericHeaders) headers[key] = value
-            headers["x-api-key"] = config.apiKey
-            headers["anthropic-version"] = "2023-06-01"
-            val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             val retryableCodes = setOf(429, 502, 503, 504)
             var attempt = 0
             var done = false
@@ -385,6 +377,8 @@ class AnthropicProvider(
             while (attempt < maxAttempts && !done) {
                 attempt++
                 val base64Files = Base64FileRegistry()
+                // Build headers: generic config.headers + x-api-key + anthrpic-version + getExtraHeaders() override
+                val headers = HttpClient.mergeHeaders(config.extraGenericHeaders, mapOf("x-api-key" to config.apiKey, "anthropic-version" to "2023-06-01"), getExtraHeaders(config)) { _, k, v -> result[k] = v }
                 val requestBody = buildRequestBody(
                     config.resolveRequest(messages),
                     base64Files,

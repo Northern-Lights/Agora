@@ -160,6 +160,22 @@ object HttpClient {
         }
     }
 
+    /** Merge headers with provider-specific overrides taking precedence. Generic config.headers first (lowest), then apiKey/provider headers. */
+    fun mergeHeaders(
+        generic: Map<String, String>?,
+        apiKeyOverride: Map<String, String>,
+        providerSpecific: Map<String, String>,
+    ): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        // Generic headers go first (lowest priority)
+        generic?.forEach { (k, v) -> result[k] = v }
+        // Provider-specific headers override (e.g., API key)
+        apiKeyOverride.forEach { (k, v) -> result[k] = v }
+        // Final provider-specific overrides (highest priority)
+        providerSpecific.forEach { (k, v) -> result[k] = v }
+        return result
+    }
+
     // ── Network proxy ─────────────────────────────────────────────────────
     enum class ProxyType { HTTP, SOCKS }
 
