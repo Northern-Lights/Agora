@@ -117,6 +117,9 @@ class OllamaProvider : LlmProvider {
     override val baseUrlPlaceholder: String = "http://localhost:11434"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
 
+    /** Provider-specific extra HTTP headers (overrides generic config.headers). */
+    protected open fun getExtraHeaders(config: ProviderConfig): Map<String, String> = emptyMap()
+
     override fun generateResponse(
         messages: List<ChatMessage>,
         config: ProviderConfig
@@ -239,12 +242,6 @@ class OllamaProvider : LlmProvider {
         )
 
         try {
-            val url = "$baseUrl/api/chat"
-            val headers = mutableMapOf("Content-Type" to "application/json")
-            if (config.apiKey.isNotEmpty()) {
-                headers["Authorization"] = "Bearer ${config.apiKey}"
-            }
-            val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             val retryableCodes = setOf(401, 429, 502, 503, 504)
             var attempt = 0
             var completed = false
@@ -252,6 +249,8 @@ class OllamaProvider : LlmProvider {
             while (attempt < maxAttempts && !completed) {
                 attempt++
                 val base64Files = Base64FileRegistry()
+                // Build headers: generic config.headers + Authorization (if set) + getExtraHeaders() override
+                val headers = HttpClient.mergeHeaders(config.extraGenericHeaders, if (config.apiKey.isNotBlank()) mapOf("Authorization" to "Bearer ${config.apiKey}") else emptyMap(), getExtraHeaders(config)) { _, k, v -> result[k] = v }
                 val requestBody = buildRequestBody(
                     config.resolveRequest(messages),
                     base64Files,
@@ -261,6 +260,7 @@ class OllamaProvider : LlmProvider {
                 val streamingRequest = base64Files.prepare(requestBodyJson)
                 requireValidSerializedRequest(
                     provider = "Ollama",
+
                     body = requestBodyJson,
                     requiredStringFields = setOf("model"),
                     requiredArrayFields = setOf("messages"),
