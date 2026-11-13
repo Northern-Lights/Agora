@@ -117,6 +117,9 @@ class OllamaProvider : LlmProvider {
     override val baseUrlPlaceholder: String = "http://localhost:11434"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
 
+    /** Provider-specific extra HTTP headers (overrides generic config.headers). */
+    protected open fun getExtraHeaders(config: ProviderConfig): Map<String, String> = emptyMap()
+
     override fun generateResponse(
         messages: List<ChatMessage>,
         config: ProviderConfig
@@ -239,8 +242,11 @@ class OllamaProvider : LlmProvider {
         )
 
         try {
-            val url = "$baseUrl/api/chat"
+            // Build headers: provider-specific overrides generic headers to prevent conflicts.
+            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
             val headers = mutableMapOf("Content-Type" to "application/json")
+            // Generic headers go first (lower priority), then API key, then provider-specific override
+            for ((key, value) in configGenericHeaders) headers[key] = value
             if (config.apiKey.isNotEmpty()) {
                 headers["Authorization"] = "Bearer ${config.apiKey}"
             }

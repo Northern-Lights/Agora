@@ -49,9 +49,12 @@ abstract class BaseOpenAiProvider : LlmProvider {
     protected open fun customizeRequest(request: OpenAiChatRequest, config: ProviderConfig): OpenAiChatRequest = request
 
     /**
-     * Extra HTTP headers to include in the POST to /chat/completions.
+     * Extra HTTP headers to include in the POST to /chat/completions (provider-specific).
+     * These are merged with [com.newoether.agora.api.ProviderConfig.extraGenericHeaders] at provider-agnostic boundaries.
+     * Provider-specific headers take precedence over generic headers.
      */
     protected open fun getExtraHeaders(config: ProviderConfig): Map<String, String> = emptyMap()
+
 
     /**
      * Transform the system prompt before it is sent. Default: pass-through.
@@ -161,7 +164,11 @@ abstract class BaseOpenAiProvider : LlmProvider {
                 return requestBodyJson to base64Files.prepare(requestBodyJson)
             }
 
+            // Build headers: provider-specific overrides generic headers to prevent conflicts.
+            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
             val headers = mutableMapOf("Content-Type" to "application/json")
+            // Generic headers go first (lower priority), then api key, then provider-specific
+            for ((key, value) in configGenericHeaders) headers[key] = value
             if (config.apiKey.isNotBlank()) headers["Authorization"] = "Bearer ${config.apiKey}"
             for ((key, value) in getExtraHeaders(config)) headers[key] = value
 

@@ -224,6 +224,9 @@ class AnthropicProvider(
 ) : LlmProvider {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
 
+    /** Provider-specific extra HTTP headers (overrides generic config.headers). */
+    protected open fun getExtraHeaders(config: ProviderConfig): Map<String, String> = emptyMap()
+
     override fun generateResponse(
         messages: List<ChatMessage>,
         config: ProviderConfig
@@ -367,7 +370,11 @@ class AnthropicProvider(
 
         try {
             val url = "$baseUrl/messages"
+            // Build headers: provider-specific overrides generic headers to prevent conflicts.
+            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
             val headers = mutableMapOf("Content-Type" to "application/json")
+            // Generic headers go first (lower priority), then API key/version, then provider-specific
+            for ((key, value) in configGenericHeaders) headers[key] = value
             headers["x-api-key"] = config.apiKey
             headers["anthropic-version"] = "2023-06-01"
             val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS

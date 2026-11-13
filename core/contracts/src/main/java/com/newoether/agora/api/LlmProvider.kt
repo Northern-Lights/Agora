@@ -112,6 +112,9 @@ data class ProviderConfig(
     val tools: List<ToolDefinition>? = null,
     val userPrepend: String? = null,
     val userPostpend: String? = null,
+    /** Extra non-provider-specific HTTP headers to include in all requests (e.g., authentication tokens that apply globally). */
+    val extraGenericHeaders: Map<String, String>? = null,
+
     val includeImages: Boolean = true,
     /** Counts and retains ordinary assistant thought segments that this request serializes. */
     val includeAssistantReasoning: Boolean = false,

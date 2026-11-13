@@ -242,6 +242,9 @@ class GeminiProvider(
 ) : LlmProvider {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
 
+    /** Provider-specific extra HTTP headers (overrides generic config.headers). */
+    protected open fun getExtraHeaders(config: ProviderConfig): Map<String, String> = emptyMap()
+
     override fun generateResponse(
         messages: List<ChatMessage>,
         config: ProviderConfig
@@ -446,10 +449,15 @@ class GeminiProvider(
                 "$baseUrl/v1beta/models/$cleanModelName:streamGenerateContent?alt=sse"
             }
 
+            // Build headers: provider-specific overrides generic headers to prevent conflicts.
+            val configGenericHeaders = config.extraGenericHeaders ?: emptyMap()
             val headers = mapOf(
                 "Content-Type" to "application/json",
                 "x-goog-api-key" to config.apiKey
             )
+            // Merge generic headers (lower priority), override with apiKey, then provider-specific (highest priority)
+            for ((key, value) in configGenericHeaders) headers[key] = value
+            headers["x-goog-api-key"] = config.apiKey
             val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             val retryableCodes = setOf(429, 500, 502, 503, 504)
             var attempt = 0
